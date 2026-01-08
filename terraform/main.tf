@@ -1,10 +1,9 @@
 terraform {
   backend "s3" {
-    bucket         = "mi-terraform-state-elektrago" # El nombre que creaste arriba
+    bucket         = "mi-terraform-state-elektrago"
     key            = "hola-mundo/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
-    # Opcional: dynamodb_table = "terraform-lock" (Para evitar ejecuciones simultáneas)
   }
 }
 
