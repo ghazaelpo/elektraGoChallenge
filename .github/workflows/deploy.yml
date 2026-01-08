@@ -9,7 +9,34 @@ env:
   PROJECT_NAME: hola-mundo
 
 jobs:
-  # 1. JOB DE BUILD: Construye y sube la imagen a ECR
+
+  # 1. JOB DE TERRAFORM: Crea la infraestructura
+  terraform-infra:
+    runs-on: ubuntu-latest
+    needs: build-and-push # Espera a que la imagen exista
+    defaults:
+      run:
+        working-directory: ./terraform
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configurar credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init & Apply
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+  # 2. JOB DE BUILD: Construye y sube la imagen a ECR
   build-and-push:
     runs-on: ubuntu-latest
     outputs:
@@ -38,31 +65,7 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-  # 2. JOB DE TERRAFORM: Crea la infraestructura
-  terraform-infra:
-    runs-on: ubuntu-latest
-    needs: build-and-push # Espera a que la imagen exista
-    defaults:
-      run:
-        working-directory: ./terraform
-    steps:
-      - name: Checkout del código
-        uses: actions/checkout@v4
 
-      - name: Configurar Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Configurar credenciales de AWS
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Terraform Init & Apply
-        run: |
-          terraform init
-          terraform apply -auto-approve
 
   # 3. JOB DE DEPLOY: Refresca el servicio para usar la nueva imagen
   deploy-service:
