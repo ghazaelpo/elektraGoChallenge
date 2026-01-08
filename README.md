@@ -1,13 +1,13 @@
-# Microservicio "Hola Mundo" - AWS App Runner + Terraform
+# Microservicio "Hola Mundo" - AWS Lambda + Terraform
 
 Este repositorio contiene un ejercicio completo de CI/CD para desplegar un microservicio en Python sobre infraestructura AWS, utilizando un enfoque de Infraestructura como Código (IaC).
 
 ## 🚀 Arquitectura
-- **Backend:** Python (Flask) retornando un JSON.
-- **Runtime:** Contenedor Docker (Python-slim).
-- **Infraestructura:** Provisionada con Terraform.
-- **Cloud:** AWS App Runner (Serverless Container Service).
-- **CI/CD:** GitHub Actions con jobs modulares (Build -> Infra -> Deploy).
+- **Backend:** Python nativo (Handler estándar de Lambda).
+- **Runtime:** Contenedor Docker basado en la imagen oficial de AWS Lambda.
+- **Infraestructura:** Provisionada con Terraform utilizando un backend remoto en S3.
+- **Cloud:** AWS Lambda con Function URL (Costo $0 / Free Tier).
+- **CI/CD:** GitHub Actions con jobs de despliegue en dos etapas (Infra ECR -> Build -> Infra Lambda).
 
 ## 🛠️ Requisitos Previos
 
@@ -16,30 +16,30 @@ Este repositorio contiene un ejercicio completo de CI/CD para desplegar un micro
 3. **Secrets en GitHub:** Configurar los siguientes Secrets en el repositorio:
    - `AWS_ACCESS_KEY_ID`
    - `AWS_SECRET_ACCESS_KEY`
+4. **Bucket S3:** Crear un bucket manualmente para el backend de Terraform (tfstate).
 
 ## 📁 Estructura del Proyecto
 
-- `/app`: Código fuente del microservicio.
-- `/terraform`: Archivos de configuración de infraestructura.
-- `.github/workflows`: Pipeline de automatización.
-- `Dockerfile`: Definición de la imagen del contenedor.
+- `/app`: Código fuente del microservicio (Handler nativo).
+- `/terraform`: Archivos de configuración de infraestructura (con lógica de `count` para creación segura).
+- `.github/workflows`: Pipeline de automatización con orquestación de dependencias (`needs`).
+- `Dockerfile`: Definición de la imagen optimizada para el Runtime Interface Client de Lambda.
 
 ## ⚙️ Despliegue Automático
 
 El despliegue se activa automáticamente al realizar un `push` a la rama `main`. El pipeline realiza:
 
-1. **Build**: Construye la imagen Docker y la sube a Amazon ECR.
-2. **Infrastructure**: Ejecuta `terraform apply` para crear/actualizar los recursos en AWS.
-3. **Deploy**: Fuerza la actualización del servicio App Runner para servir la última imagen.
+1. **Infrastructure (Step 1)**: Crea el repositorio ECR y los roles de IAM necesarios.
+2. **Build**: Construye la imagen Docker y la sube a Amazon ECR.
+3. **Infrastructure (Step 2)**: Ejecuta `terraform apply` activando la creación de la Lambda una vez que la imagen ya existe.
 
 ## 🧪 Cómo Probar el Endpoint
 
 Una vez que el pipeline finalice exitosamente:
 
-1. Ve a la consola de **AWS App Runner**.
-2. Selecciona el servicio `hola-mundo-service`.
-3. Copia la **Default domain URL**.
-4. Ejecuta un `curl` o ábrelo en tu navegador:
+1. El endpoint se mostrará en los logs del job `deploy-lambda` bajo el nombre `service_url`.
+2. También puedes obtenerlo desde la consola de **AWS Lambda** > **Function URL**.
+3. Ejecuta un `curl` o ábrelo en tu navegador:
 
 ```bash
-curl https://<id-del-servicio>.<region>[.awsapprunner.com/](https://.awsapprunner.com/)
+curl https://<id-de-la-url>.lambda-url.us-east-1.on.aws/
