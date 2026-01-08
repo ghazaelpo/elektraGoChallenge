@@ -1,6 +1,6 @@
-# Microservicio "Hola Mundo" - AWS Lambda + Terraform
+# Microservicio "Hola Mundo" - AWS Lambda + Terraform + GitHub Actions
 
-Este repositorio contiene un ejercicio completo de CI/CD para desplegar un microservicio en Python sobre infraestructura AWS, utilizando un enfoque de Infraestructura como Código (IaC).
+Este repositorio contiene un ejercicio completo de CI/CD para desplegar un microservicio en Python (un simple Hola Mundo) sobre infraestructura AWS, utilizando un enfoque de Infraestructura como Código (IaC).
 
 ## 🚀 Arquitectura
 - **Backend:** Python nativo (Handler estándar de Lambda).
@@ -20,8 +20,8 @@ Este repositorio contiene un ejercicio completo de CI/CD para desplegar un micro
 
 ## 📁 Estructura del Proyecto
 
-- `/app`: Código fuente del microservicio (Handler nativo).
-- `/terraform`: Archivos de configuración de infraestructura (Limpio, sin lógica de count).
+- `/app`: Código fuente del microservicio.
+- `/terraform`: Archivos de configuración de infraestructura.
 - `.github/workflows`: Pipeline de automatización con orquestación de dependencias (`needs`).
 - `Dockerfile`: Definición de la imagen optimizada para el Runtime Interface Client de Lambda.
 
@@ -43,3 +43,4 @@ Una vez que el pipeline finalice exitosamente:
 
 ```bash
 curl https://<id-de-la-url>.lambda-url.us-east-1.on.aws/
+curl https://jlvcyubccb3wfwp6pbyxisbnbe0rltth.lambda-url.us-east-1.on.aws/
