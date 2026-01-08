@@ -1,5 +1,20 @@
+terraform {
+  backend "s3" {
+    bucket         = "mi-terraform-state-elektrago" # El nombre que creaste arriba
+    key            = "hola-mundo/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    # Opcional: dynamodb_table = "terraform-lock" (Para evitar ejecuciones simultáneas)
+  }
+}
+
 provider "aws" {
   region = var.aws_region
+}
+
+variable "create_lambda" {
+  type    = bool
+  default = false
 }
 
 # 1. Repositorio ECR
@@ -30,6 +45,7 @@ resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
 
 # 3. Función Lambda (Usa la imagen de ECR)
 resource "aws_lambda_function" "hola_mundo" {
+  count         = var.create_lambda ? 1 : 0
   function_name = "${var.project_name}-function"
   role          = aws_iam_role.lambda_role.arn
   package_type  = "Image"
@@ -43,7 +59,8 @@ resource "aws_lambda_function" "hola_mundo" {
 
 # 4. URL Pública para la Lambda (Gratis y sin autenticación para el ejercicio)
 resource "aws_lambda_function_url" "endpoint" {
-  function_name      = aws_lambda_function.hola_mundo.function_name
+  count              = var.create_lambda ? 1 : 0
+  function_name      = aws_lambda_function.hola_mundo[0].function_name
   authorization_type = "NONE"
 
   cors {
