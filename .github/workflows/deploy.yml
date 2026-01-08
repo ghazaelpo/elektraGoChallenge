@@ -1,0 +1,84 @@
+name: CI/CD Hola Mundo
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: hola-mundo
+
+jobs:
+  # 1. JOB DE BUILD: Construye y sube la imagen a ECR
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      ecr_repository: ${{ steps.login-ecr.outputs.registry }}
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login a Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-repo
+          IMAGE_TAG: latest
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+  # 2. JOB DE TERRAFORM: Crea la infraestructura
+  terraform-infra:
+    runs-on: ubuntu-latest
+    needs: build-and-push # Espera a que la imagen exista
+    defaults:
+      run:
+        working-directory: ./terraform
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configurar credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init & Apply
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+  # 3. JOB DE DEPLOY: Refresca el servicio para usar la nueva imagen
+  deploy-service:
+    runs-on: ubuntu-latest
+    needs: terraform-infra
+    steps:
+      - name: Configurar credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Force App Runner Deployment
+        run: |
+          # Obtenemos el ARN del servicio
+          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='${{ env.PROJECT_NAME }}-service'].ServiceArn" --output text)
+          # Iniciamos el despliegue manual para asegurar que tome la última imagen
+          aws apprunner start-deployment --service-arn $SERVICE_ARN
