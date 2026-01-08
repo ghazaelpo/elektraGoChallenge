@@ -1,12 +1,10 @@
-FROM python:3.9-slim
+FROM public.ecr.aws/lambda/python:3.9
 
-WORKDIR /app
-
+# Copiamos el código
+COPY app/main.py ${LAMBDA_TASK_ROOT}
 COPY app/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app/ .
+# Instalamos dependencias
+RUN pip install -r requirements.txt
 
-EXPOSE 8080
-
-CMD ["python", "main.py"]
+CMD [ "main.handler" ]

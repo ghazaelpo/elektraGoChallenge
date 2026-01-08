@@ -1,4 +1,4 @@
-name: CI/CD Hola Mundo
+name: CI/CD Lambda Hola Mundo
 
 on:
   push:
@@ -9,21 +9,21 @@ env:
   PROJECT_NAME: hola-mundo
 
 jobs:
-
-  # 1. JOB DE TERRAFORM: Crea la infraestructura
   terraform-infra:
     runs-on: ubuntu-latest
+    outputs:
+      ecr_url: ${{ steps.set-ecr.outputs.ecr_url }}
     defaults:
       run:
         working-directory: ./terraform
     steps:
-      - name: Checkout del código
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Configurar Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Configurar credenciales de AWS
+      - name: AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -35,53 +35,50 @@ jobs:
           terraform init
           terraform apply -auto-approve
 
-  # 2. JOB DE BUILD: Construye y sube la imagen a ECR
+      - name: Set ECR Output
+        id: set-ecr
+        run: |
+          URL=$(terraform output -raw ecr_repository_url)
+          echo "ecr_url=$URL" >> $GITHUB_OUTPUT
+
   build-and-push:
     runs-on: ubuntu-latest
     needs: terraform-infra
-    outputs:
-      ecr_repository: ${{ steps.login-ecr.outputs.registry }}
     steps:
-      - name: Checkout del código
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configurar credenciales de AWS
+      - name: AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login a Amazon ECR
+      - name: Login to ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag, and push image to Amazon ECR
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}-repo
-          IMAGE_TAG: latest
+      - name: Build and Push
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          ECR_URL=${{ needs.terraform-infra.outputs.ecr_url }}
+          docker build -t $ECR_URL:latest .
+          docker push $ECR_URL:latest
 
-
-
-  # 3. JOB DE DEPLOY: Refresca el servicio para usar la nueva imagen
-  deploy-service:
+  deploy-lambda:
     runs-on: ubuntu-latest
-    needs: terraform-infra
+    needs: [terraform-infra, build-and-push]
     steps:
-      - name: Configurar credenciales de AWS
+      - name: AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Force App Runner Deployment
+      - name: Update Lambda Image
         run: |
-          # Obtenemos el ARN del servicio
-          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='${{ env.PROJECT_NAME }}-service'].ServiceArn" --output text)
-          # Iniciamos el despliegue manual para asegurar que tome la última imagen
-          aws apprunner start-deployment --service-arn $SERVICE_ARN
+          ECR_URL=${{ needs.terraform-infra.outputs.ecr_url }}
+          aws lambda update-function-code \
+            --function-name ${{ env.PROJECT_NAME }}-function \
+            --image-uri $ECR_URL:latest
