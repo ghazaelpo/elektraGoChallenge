@@ -53,7 +53,7 @@ resource "aws_lambda_function" "hola_mundo" {
 
 # 4. URL Pública para la Lambda (Gratis y sin autenticación para el ejercicio)
 resource "aws_lambda_function_url" "endpoint" {
-  function_name      = aws_lambda_function.hola_mundo[0].function_name
+  function_name      = aws_lambda_function.hola_mundo.function_name
   authorization_type = "NONE"
 
   cors {
