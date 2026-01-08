@@ -9,7 +9,7 @@ Este repositorio contiene un ejercicio completo de CI/CD para desplegar un micro
 - **Cloud:** AWS Lambda con Function URL (Costo $0 / Free Tier).
 - **CI/CD:** GitHub Actions con flujo de trabajo continuo (Infra -> Build -> Deploy).
 
-## 🛠️ Requisitos Previos (sólo local o en caso de hacer fork del proyecto)
+## 🛠️ Requisitos Previos (local)
 
 1. **AWS CLI** configurado con permisos de Administrador.
 2. **Terraform** v1.5.0+ instalado.
