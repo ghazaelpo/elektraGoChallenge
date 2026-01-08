@@ -33,7 +33,7 @@ jobs:
       - name: Terraform Init & Apply
         run: |
           terraform init
-          terraform apply -auto-approve -var="create_lambda=false"
+          terraform apply -auto-approve 
 
       - name: Set ECR Output
         id: set-ecr
@@ -68,15 +68,9 @@ jobs:
   deploy-lambda:
     runs-on: ubuntu-latest
     needs: [terraform-infra, build-and-push]
-    defaults:
-      run:
-        working-directory: ./terraform
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Configurar Terraform
-        uses: hashicorp/setup-terraform@v3
 
       - name: AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -85,7 +79,8 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Terraform Init & Apply (Crear Lambda)
+      - name: Update Lambda Code
         run: |
-          terraform init
-          terraform apply -auto-approve -var="create_lambda=true"
+          aws lambda update-function-code \
+            --function-name ${{ env.PROJECT_NAME }}-function \
+            --image-uri ${{ needs.terraform-infra.outputs.ecr_url }}:latest
